@@ -77,8 +77,7 @@ class PrimaryBatch(MessageBatch):
 
     def __iter__(self):
         yield self.primary_message
-        for child in self.children:
-            yield child
+        yield from self.children
 
     def path(self):
         return self.primary_message.path
@@ -113,8 +112,7 @@ class ChildBatch(MessageBatch):
         self.primary_batch = primary_batch
 
     def __iter__(self):
-        for child in self.children:
-            yield child
+        yield from self.children
 
     def path(self):
         return self.children[0].path

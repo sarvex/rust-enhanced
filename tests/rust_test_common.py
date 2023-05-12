@@ -72,8 +72,9 @@ class TestBase(unittest.TestCase):
         self._original_settings = {}
         self.settings = sublime.load_settings('RustEnhanced.sublime-settings')
         # Ensure all settings are at defaults.
-        defaults = sublime.load_resource('Packages/%s/RustEnhanced.sublime-settings' % (
-            util.PACKAGE_NAME,))
+        defaults = sublime.load_resource(
+            f'Packages/{util.PACKAGE_NAME}/RustEnhanced.sublime-settings'
+        )
         defaults = sublime.decode_value(defaults)
         for key, value in defaults.items():
             self._override_setting(key, value)
@@ -118,9 +119,8 @@ class TestBase(unittest.TestCase):
             Use this when there is a thread currently running, and you want to
             make sure you get the next thread that starts.
         """
-        for n in range(1000):
-            t = rust_thread.THREADS.get(sublime.active_window().id())
-            if t:
+        for _ in range(1000):
+            if t := rust_thread.THREADS.get(sublime.active_window().id()):
                 if previous_thread is None or previous_thread != t:
                     return t
             time.sleep(0.01)
@@ -143,8 +143,7 @@ class TestBase(unittest.TestCase):
 
     def _get_build_output(self, window):
         opanel = window.find_output_panel(plugin.rust.opanel.PANEL_NAME)
-        output = opanel.substr(sublime.Region(0, opanel.size()))
-        return output
+        return opanel.substr(sublime.Region(0, opanel.size()))
 
     def _with_open_file(self, filename, f, **kwargs):
         """Opens filename (relative to the plugin) in a new view, calls
@@ -216,11 +215,10 @@ class TestBase(unittest.TestCase):
         messages.clear_messages(window)
 
     def _skip_clippy(self):
-        if 'RE_SKIP_CLIPPY' in os.environ:
-            print('Skipping Clippy test.')
-            return True
-        else:
+        if 'RE_SKIP_CLIPPY' not in os.environ:
             return False
+        print('Skipping Clippy test.')
+        return True
 
 
 class AlteredSetting(object):
@@ -240,7 +238,7 @@ class AlteredSetting(object):
         self.settings.set(self.name, self.orig)
 
     def __str__(self):
-        return '%s=%s' % (self.name, self.value)
+        return f'{self.name}={self.value}'
 
 
 class UiIntercept(object):

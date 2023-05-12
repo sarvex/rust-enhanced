@@ -83,18 +83,14 @@ class Message:
             region.  Otherwise returns the last line of the region.
         """
         if self.span:
-            if first:
-                return self.span[0][0]
-            else:
-                return self.span[1][0]
+            return self.span[0][0] if first else self.span[1][0]
         else:
             return 999999999
 
     def __iter__(self):
         """Convenience iterator for iterating over the message and its children."""
         yield self
-        for child in self.children:
-            yield child
+        yield from self.children
 
     def escaped_text(self, view, indent):
         """Returns the minihtml markup of the message.
@@ -126,11 +122,14 @@ class Message:
         def escape_and_link(i_txt):
             i, txt = i_txt
             if i % 2:
-                return '<a href="%s">%s</a>' % (txt, txt)
-            else:
-                escaped = html.escape(txt, quote=False)
-                return re.sub('^( +)', lambda m: '&nbsp;'*len(m.group()), escaped, flags=re.MULTILINE)\
-                    .replace('\n', '<br>' + indent)
+                return f'<a href="{txt}">{txt}</a>'
+            escaped = html.escape(txt, quote=False)
+            return re.sub(
+                '^( +)',
+                lambda m: '&nbsp;' * len(m.group()),
+                escaped,
+                flags=re.MULTILINE,
+            ).replace('\n', f'<br>{indent}')
 
         parts = re.split(LINK_PATTERN, text)
         return ' '.join(map(escape_and_link, enumerate(parts)))
@@ -162,11 +161,9 @@ class Message:
         """
         if self.parent:
             return self.parent.suggestion_count()
-        count = 0
-        for m in self:
-            if m.suggested_replacement is not None and not m.hidden:
-                count += 1
-        return count
+        return sum(
+            1 for m in self if m.suggested_replacement is not None and not m.hidden
+        )
 
     def is_similar(self, other):
         """Returns True if this message is essentially the same as the given
@@ -180,22 +177,19 @@ class Message:
 
     def sublime_region(self, view):
         """Returns a sublime.Region object for this message."""
-        if self.span:
-            regions = view.get_regions(self.region_key)
-            if regions:
-                self.span = (
-                    view.rowcol(regions[0].a),
-                    view.rowcol(regions[0].b)
-                )
-                return regions[0]
-            else:
-                return sublime.Region(
-                    view.text_point(self.span[0][0], self.span[0][1]),
-                    view.text_point(self.span[1][0], self.span[1][1])
-                )
-        else:
+        if not self.span:
             # Place at bottom of file for lack of anywhere better.
             return sublime.Region(view.size())
+        if not (regions := view.get_regions(self.region_key)):
+            return sublime.Region(
+                view.text_point(self.span[0][0], self.span[0][1]),
+                view.text_point(self.span[1][0], self.span[1][1])
+            )
+        self.span = (
+            view.rowcol(regions[0].a),
+            view.rowcol(regions[0].b)
+        )
+        return regions[0]
 
     def __repr__(self):
         result = ['<Message\n']
@@ -263,16 +257,13 @@ def _draw_region_highlights(view, batch):
         return
     elif region_style == 'solid_underline':
         flags |= sublime.DRAW_NO_OUTLINE | sublime.DRAW_SOLID_UNDERLINE
-    elif region_style == 'stippled_underline':
-        flags |= sublime.DRAW_NO_OUTLINE | sublime.DRAW_STIPPLED_UNDERLINE
     elif region_style == 'squiggly_underline':
         flags |= sublime.DRAW_NO_OUTLINE | sublime.DRAW_SQUIGGLY_UNDERLINE
 
+    elif region_style == 'stippled_underline':
+        flags |= sublime.DRAW_NO_OUTLINE | sublime.DRAW_STIPPLED_UNDERLINE
     if batch.hidden:
         return
-    if batch.hidden:
-        return
-
     # Collect message regions by level.
     regions = {level: [] for level in LEVELS.values()}
     for msg in batch:
@@ -291,10 +282,7 @@ def _draw_region_highlights(view, batch):
         #     region.redish, region.orangish, region.yellowish,
         #     region.greenish, region.bluish, region.purplish and
         #     region.pinkish
-        if level == 'error':
-            scope = 'invalid'
-        else:
-            scope = 'info'
+        scope = 'invalid' if level == 'error' else 'info'
         icon = util.icon_path(level.name)
         for key, region in regions[level]:
             _sublime_add_regions(view, key, [region], scope, icon, flags)
@@ -339,8 +327,7 @@ def batches_at_point(view, point, hover_zone):
 
 def message_popup(view, point, hover_zone):
     """Displays a popup if there is a message at the given point."""
-    batches = batches_at_point(view, point, hover_zone)
-    if batches:
+    if batches := batches_at_point(view, point, hover_zone):
         theme = themes.THEMES[util.get_setting('rust_message_theme')]
         minihtml = '\n'.join(theme.render(view, batch, for_popup=True) for batch in batches)
         if not minihtml:
@@ -357,8 +344,7 @@ STATUS_KEY = 'rust-msg-status'
 def update_status(view):
     """Display diagnostic messages in status bar under the cursor."""
     for r in view.sel():
-        batches = batches_at_point(view, r.begin(), sublime.HOVER_TEXT)
-        if batches:
+        if batches := batches_at_point(view, r.begin(), sublime.HOVER_TEXT):
             msg = batches[0].first()
             view.set_status(STATUS_KEY, msg.text)
             return
@@ -381,8 +367,8 @@ def _click_handler(view, url, hide_popup=False):
         if path.endswith(':external'):
             path = path[:-9]
             external = True
-        new_view = view.window().open_file(path, sublime.ENCODED_POSITION)
         if external:
+            new_view = view.window().open_file(path, sublime.ENCODED_POSITION)
             new_view.set_read_only(True)
     elif url.startswith('replace:'):
         info = urllib.parse.parse_qs(url[8:], keep_blank_values=True)
@@ -450,17 +436,16 @@ def _show_phantom(view, batch):
         )
 
     theme = themes.THEMES[util.get_setting('rust_message_theme')]
-    content = theme.render(view, batch)
-    if not content:
+    if content := theme.render(view, batch):
+        _sublime_add_phantom(
+            view,
+            first.region_key, region,
+            content,
+            sublime.LAYOUT_BLOCK,
+            functools.partial(_click_handler, view)
+        )
+    else:
         return
-
-    _sublime_add_phantom(
-        view,
-        first.region_key, region,
-        content,
-        sublime.LAYOUT_BLOCK,
-        functools.partial(_click_handler, view)
-    )
 
 
 def _sublime_add_phantom(view, key, region, content, layout, on_navigate):
@@ -536,13 +521,7 @@ def _show_message(window, current_idx, transient=False, force_open=False):
     view = None
     if not transient and not force_open:
         active = window.active_view()
-        if active.file_name() == path:
-            # If a file is open in multiple views, try to stick to the current
-            # view.  Otherwise it may jump to the other view which is a little
-            # jarring.
-            view = active
-        else:
-            view = window.find_open_file(path)
+        view = active if active.file_name() == path else window.find_open_file(path)
         if view:
             _scroll_to_message(view, msg, transient)
     if not view:
@@ -554,13 +533,7 @@ def _show_message(window, current_idx, transient=False, force_open=False):
             # focus. See:
             # https://github.com/SublimeTextIssues/Core/issues/1041
             flags |= sublime.TRANSIENT | sublime.FORCE_GROUP
-        if msg.span:
-            # show_at_center is buggy with newly opened views (see
-            # https://github.com/SublimeTextIssues/Core/issues/538).
-            # ENCODED_POSITION is 1-based.
-            row, col = msg.span[1]
-        else:
-            row, col = (999999999, 1)
+        row, col = msg.span[1] if msg.span else (999999999, 1)
         view = window.open_file('%s:%d:%d' % (path, row + 1, col + 1),
                                 flags)
         # Block until the view is loaded.
@@ -582,8 +555,7 @@ def _scroll_build_panel(window, message):
     if message.output_panel_region:
         # Defer cyclic import.
         from . import opanel
-        view = window.find_output_panel(opanel.PANEL_NAME)
-        if view:
+        if view := window.find_output_panel(opanel.PANEL_NAME):
             r = message.output_panel_region
             view.run_command('rust_scroll_to_region', {'region': (r.a, r.b)})
 
@@ -604,8 +576,7 @@ def redraw_all_open_views(window):
         return
     winfo['hidden'] = False
     for path, batches in winfo['paths'].items():
-        views = util.open_views_for_file(window, path)
-        if views:
+        if views := util.open_views_for_file(window, path):
             for batch in batches:
                 # Phantoms seem to be attached to the buffer.
                 _show_phantom(views[0], batch)
@@ -674,10 +645,9 @@ def _advance_next_message(window, levels, wrap_around=False):
     if wrap_around:
         # No matching entries, give up.
         return None
-    else:
-        # Start over at the beginning of the list.
-        win_info['batch_index'] = (-1, -1)
-        return _advance_next_message(window, levels, wrap_around=True)
+    # Start over at the beginning of the list.
+    win_info['batch_index'] = (-1, -1)
+    return _advance_next_message(window, levels, wrap_around=True)
 
 
 def _last_index(paths):
@@ -715,10 +685,9 @@ def _advance_prev_message(window, levels, wrap_around=False):
     if wrap_around:
         # No matching entries, give up.
         return None
-    else:
-        # Start over at the end of the list.
-        win_info['batch_index'] = (-1, -1)
-        return _advance_prev_message(window, levels, wrap_around=True)
+    # Start over at the end of the list.
+    win_info['batch_index'] = (-1, -1)
+    return _advance_prev_message(window, levels, wrap_around=True)
 
 
 def _is_matching_level(levels, message):
@@ -764,9 +733,7 @@ def list_messages(window):
             message = batch.primary_message
             jump_to.append((path_idx, batch_idx))
             if message.span:
-                path_label = '%s:%s' % (
-                    _relative_path(window, path),
-                    message.span[0][0] + 1)
+                path_label = f'{_relative_path(window, path)}:{message.span[0][0] + 1}'
             else:
                 path_label = _relative_path(window, path)
             item = [message.text, path_label]
@@ -830,11 +797,11 @@ def _is_duplicate_message(window, primary_message):
     batches = WINDOW_MESSAGES.get(window.id(), {})\
                              .get('paths', {})\
                              .get(primary_message.path, [])
-    for batch in batches:
-        if isinstance(batch, PrimaryBatch):
-            if batch.primary_message.is_similar(primary_message):
-                return True
-    return False
+    return any(
+        isinstance(batch, PrimaryBatch)
+        and batch.primary_message.is_similar(primary_message)
+        for batch in batches
+    )
 
 
 def _is_external(window, path):
@@ -842,10 +809,7 @@ def _is_external(window, path):
         return True
     if not os.path.isabs(path):
         return False
-    for folder in window.folders():
-        if path.startswith(folder + os.sep):
-            return False
-    return True
+    return not any(path.startswith(folder + os.sep) for folder in window.folders())
 
 
 def _collect_rust_messages(window, base_path, info, target_path,
@@ -1048,14 +1012,15 @@ def _collect_rust_messages(window, base_path, info, target_path,
                         span['file_name'] = target_path
                         span['line_start'] = None
                     # else, messages will be shown in console via msg_cb.
-                add_additional(window, span,
-                    'Errors occurred in %s from external crate' % (macro_name,),
-                    info['level'])
+                add_additional(
+                    window,
+                    span,
+                    f'Errors occurred in {macro_name} from external crate',
+                    info['level'],
+                )
                 text = ''.join([x['text'] for x in span['text']])
                 if text:
-                    add_additional(window, span,
-                        'Macro text: %s' % (text,),
-                        info['level'])
+                    add_additional(window, span, f'Macro text: {text}', info['level'])
             else:
                 if not expansion or not expansion['def_site_span'] \
                         or _is_external(window, expansion['def_site_span']['file_name']):
@@ -1108,10 +1073,7 @@ def _collect_rust_messages(window, base_path, info, target_path,
 def _batch_and_cross_link(window, primary_message):
     """Creates a list of MessageBatch objects with appropriate cross links."""
     def make_file_path(msg):
-        if _is_external(window, msg.path):
-            external = ':external'
-        else:
-            external = ''
+        external = ':external' if _is_external(window, msg.path) else ''
         if msg.span:
             return 'file:///%s:%s:%s%s' % (
                 msg.path.replace('\\', '/'),
@@ -1122,7 +1084,7 @@ def _batch_and_cross_link(window, primary_message):
         else:
             # Arbitrarily large line number to force it to the bottom of the
             # file, since we don't know ahead of time how large the file is.
-            return 'file:///%s:999999999%s' % (msg.path, external)
+            return f'file:///{msg.path}:999999999{external}'
 
     # Group messages by line.
     primary_batch = PrimaryBatch(primary_message)
@@ -1142,16 +1104,10 @@ def _batch_and_cross_link(window, primary_message):
     def make_link_text(msg, other):
         # text for msg -> other
         if msg.path == other.path:
-            if msg.lineno() < other.lineno():
-                filename = '\u2193'  # down arrow
-            else:
-                filename = '\u2191'  # up arrow
+            filename = '\u2193' if msg.lineno() < other.lineno() else '\u2191'
         else:
             filename = os.path.basename(other.path)
-        if other.span:
-            return '%s:%s' % (filename, other.lineno() + 1,)
-        else:
-            return filename
+        return f'{filename}:{other.lineno() + 1}' if other.span else filename
 
     # Create cross links.
     back_url = make_file_path(primary_message)
@@ -1199,8 +1155,7 @@ def _save_batches(window, batches, msg_cb):
         for i, msg in enumerate(batch):
             msg.region_key = 'rust-%i' % (num + i,)
         if not WINDOW_MESSAGES[wid]['hidden']:
-            views = util.open_views_for_file(window, batch.path())
-            if views:
+            if views := util.open_views_for_file(window, batch.path()):
                 # Phantoms seem to be attached to the buffer.
                 _show_phantom(views[0], batch)
                 for view in views:

@@ -14,27 +14,18 @@ multi_target_root = os.path.join(plugin_path,
 
 def exe(s):
     """Wrapper around a filename to add .exe extension on windows."""
-    if sys.platform == 'win32':
-        return s + '.exe'
-    else:
-        return s
+    return f'{s}.exe' if sys.platform == 'win32' else s
 
 
 def linux_or_mac(s):
-    if sys.platform == 'linux' or sys.platform == 'darwin':
-        return s
-    else:
-        return None
+    return s if sys.platform in ['linux', 'darwin'] else None
 
 
 def version(filename, check_version):
     """Wrapper around a filename to make it optional based on the rustc version."""
     rustc_version = util.get_rustc_version(sublime.active_window(),
                                            plugin_path)
-    if semver.match(rustc_version, check_version):
-        return filename
-    else:
-        return None
+    return filename if semver.match(rustc_version, check_version) else None
 
 
 def debug_wrapper(f):
@@ -127,9 +118,7 @@ class TestCargoBuild(TestBase):
                 not x.endswith('.o') and
                 not x.endswith('.pdb')]
             files.sort()
-            # Remove any option (None) entries.
-            expected_files = list(filter(None, expected_files))
-            expected_files.sort()
+            expected_files = sorted(filter(None, expected_files))
             if len(files) != len(expected_files):
                 raise AssertionError('Lists differ: %r != %r' % (files, expected_files))
             for file, expected_file in zip(files, expected_files):
@@ -492,8 +481,11 @@ class TestCargoBuild(TestBase):
                  r'may not be used on the (stable|beta) release channel'))
 
         for path, pattern in tests:
-            self._with_open_file('tests/multi-targets/' + path,
-                self._test_auto_build, pattern=pattern)
+            self._with_open_file(
+                f'tests/multi-targets/{path}',
+                self._test_auto_build,
+                pattern=pattern,
+            )
 
     def _test_auto_build(self, view, pattern=None):
         window = view.window()

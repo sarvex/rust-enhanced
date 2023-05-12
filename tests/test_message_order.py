@@ -85,7 +85,7 @@ class TestMessageOrder(TestBase):
         that next/prev message goes to the correct message in order.
         """
         for data in TEST_DATA:
-            print('testing %s' % (data['path'],))
+            print(f"testing {data['path']}")
             path = os.path.join('tests/message-order', data['path'])
 
             # rust_next_message sorts based on error level.
@@ -121,8 +121,7 @@ class TestMessageOrder(TestBase):
                            (level == 'error' and next_level != 'ERR') or
                            (level == 'warning' and next_level != 'WARN')):
                             continue
-                        window.run_command('rust_' + direction + '_message',
-                            {'levels': level})
+                        window.run_command(f'rust_{direction}_message', {'levels': level})
                         # Sublime doesn't always immediately move the active
                         # view when 'next_result' is called, so give it a
                         # moment to update.
@@ -179,7 +178,7 @@ class TestMessageOrder(TestBase):
         self._run_build_wait()
         # Verify command does nothing.
         for direction in ('next', 'prev'):
-            window.run_command('rust_' + direction + '_message')
+            window.run_command(f'rust_{direction}_message')
             active = window.active_view()
             self.assertEqual(active, view)
             sel = active.sel()[0]

@@ -195,10 +195,9 @@ class RustProc(object):
             global USER_SHELL_ENV
             if USER_SHELL_ENV is None:
                 USER_SHELL_ENV = shellenv.get_env()[1]
-            self.env.update(USER_SHELL_ENV)
+            self.env |= USER_SHELL_ENV
 
-        rust_env = util.get_setting('rust_env')
-        if rust_env:
+        if rust_env := util.get_setting('rust_env'):
             for k, v in rust_env.items():
                 rust_env[k] = os.path.expandvars(v)
             self.env.update(rust_env)
@@ -234,8 +233,10 @@ class RustProc(object):
                 stderr=subprocess.STDOUT,
             )
 
-        self._stdout_thread = threading.Thread(target=self._read_stdout,
-            name='%s: Stdout' % (threading.current_thread().name,))
+        self._stdout_thread = threading.Thread(
+            target=self._read_stdout,
+            name=f'{threading.current_thread().name}: Stdout',
+        )
         self._stdout_thread.start()
 
     def terminate(self):
@@ -256,8 +257,9 @@ class RustProc(object):
             # /T - Kill tree
             # /F - Force kill
             subprocess.Popen(
-                'taskkill /T /F /PID ' + str(self.proc.pid),
-                startupinfo=startupinfo)
+                f'taskkill /T /F /PID {str(self.proc.pid)}',
+                startupinfo=startupinfo,
+            )
         else:
             # Must kill the entire process group.  The rustup wrapper won't
             # forward the signal to cargo, and cargo doesn't forward signals
@@ -306,12 +308,13 @@ class RustProc(object):
                     try:
                         self.listener.on_json(self, result)
                     except:
-                        self.listener.on_error(self,
-                            'Rust Enhanced Internal Error: %s' % (
-                                traceback.format_exc(),))
+                        self.listener.on_error(
+                            self,
+                            f'Rust Enhanced Internal Error: {traceback.format_exc()}',
+                        )
             else:
                 if self.json_stop_pattern and \
-                        re.match(self.json_stop_pattern, line):
+                            re.match(self.json_stop_pattern, line):
                     # Stop looking for JSON open curly bracket.
                     self.decode_json = False
                 if line.startswith('--- stderr'):

@@ -108,7 +108,7 @@ class CargoConfigBase(sublime_plugin.WindowCommand):
             self.done()
             return
 
-        f_selected = getattr(self, 'selected_' + q, None)
+        f_selected = getattr(self, f'selected_{q}', None)
 
         # Called with the result of what the user selected.
         def make_choice(value):
@@ -127,7 +127,7 @@ class CargoConfigBase(sublime_plugin.WindowCommand):
             make_choice(self.cmd_input[q])
         else:
             try:
-                item_info = getattr(self, 'items_' + q)()
+                item_info = getattr(self, f'items_{q}')()
             except CancelCommandError:
                 return
             if not isinstance(item_info, dict):
@@ -215,7 +215,7 @@ class CargoConfigBase(sublime_plugin.WindowCommand):
                         log.critical(self.window,
                             'Failed to load Cargo manifest in %r', dirpath)
 
-        if len(self.packages) == 0:
+        if not self.packages:
             sublime.error_message(util.multiline_fix("""
                 Error: Cannot determine Rust package to use.
 
@@ -223,8 +223,7 @@ class CargoConfigBase(sublime_plugin.WindowCommand):
             raise CancelCommandError
 
         def display_name(package):
-            return ['Package: %s' % (package['name'],),
-                    package['sublime_relative']]
+            return [f"Package: {package['name']}", package['sublime_relative']]
 
         items = [(display_name(package), path)
             for path, package in self.packages.items()]
@@ -246,13 +245,10 @@ class CargoConfigBase(sublime_plugin.WindowCommand):
             if kind in ('lib', 'rlib', 'dylib', 'cdylib', 'staticlib', 'proc-macro'):
                 kinds.setdefault('lib', []).append(('Lib', '--lib'))
             elif kind in ('bin', 'test', 'example', 'bench'):
-                text = '%s: %s' % (kind.capitalize(), target['name'])
-                arg = '--%s %s' % (kind, target['name'])
+                text = f"{kind.capitalize()}: {target['name']}"
+                arg = f"--{kind} {target['name']}"
                 kinds.setdefault(kind, []).append((text, arg))
-            elif kind in ('custom-build',):
-                # build.rs, can't be built explicitly.
-                pass
-            else:
+            elif kind not in ('custom-build',):
                 log.critical(self.window,
                     'Rust: Unsupported target found: %s', kind)
         items = []
@@ -270,10 +266,11 @@ class CargoConfigBase(sublime_plugin.WindowCommand):
         return items
 
     def items_variant(self):
-        result = []
-        for key, info in CARGO_COMMANDS.items():
-            if self.filter_variant(info):
-                result.append((info['name'], key))
+        result = [
+            (info['name'], key)
+            for key, info in CARGO_COMMANDS.items()
+            if self.filter_variant(info)
+        ]
         result.sort()
         return result
 
@@ -413,15 +410,9 @@ class CargoConfigBase(sublime_plugin.WindowCommand):
         channels = ['nightly', 'beta', 'stable', '\d\.\d{1,2}\.\d']
         pattern = '(%s)(?:-(\d{4}-\d{2}-\d{2}))?(?:-(.*))' % '|'.join(channels)
         for toolchain in output:
-            m = re.match(pattern, toolchain)
-            # Should always match.
-            if m:
-                channel = m.group(1)
-                date = m.group(2)
-                if date:
-                    shorthand = '%s-%s' % (channel, date)
-                else:
-                    shorthand = channel
+            if m := re.match(pattern, toolchain):
+                channel = m[1]
+                shorthand = f'{channel}-{date}' if (date := m[2]) else channel
                 if shorthand not in shorthands:
                     shorthands.append(shorthand)
         result = shorthands + output
@@ -453,10 +444,7 @@ class CargoSetProfile(CargoConfigBase):
 
     def items_profile(self):
         default = self.get_setting('release', False)
-        if default:
-            default = 'release'
-        else:
-            default = 'dev'
+        default = 'release' if default else 'dev'
         items = [('Dev', 'dev'),
                  ('Release', 'release')]
         return {'items': items,
@@ -506,9 +494,9 @@ class CargoSetTriple(CargoConfigBase):
         # us which targets are installed.
 
         # The target list depends on the toolchain used.
-        cmd = 'rustup target list --toolchain=%s' % self.choices['toolchain']
+        cmd = f"rustup target list --toolchain={self.choices['toolchain']}"
         triples = rust_proc.check_output(self.window, cmd.split(), None)\
-            .splitlines()
+                .splitlines()
         current = self.get_setting('target_triple')
         result = [('Use Default', None)]
         for triple in triples:
@@ -765,10 +753,11 @@ class CargoCreateNewBuild(CargoConfigBase):
 
                 Save your Sublime project and try again."""))
             raise CancelCommandError
-        result = []
-        for key, info in CARGO_COMMANDS.items():
-            if self.filter_variant(info):
-                result.append((info['name'], key))
+        result = [
+            (info['name'], key)
+            for key, info in CARGO_COMMANDS.items()
+            if self.filter_variant(info)
+        ]
         result.sort()
         result.append(('New Command', 'NEW_COMMAND'))
         return result
@@ -779,13 +768,12 @@ class CargoCreateNewBuild(CargoConfigBase):
                 'allows_release', 'allows_features', 'allows_json',
                 'requires_manifest', 'requires_view_path', 'wants_run_args',
                 'name']
-        else:
-            cinfo = CARGO_COMMANDS[command]
-            result = []
-            if cinfo.get('requires_manifest', True):
-                result.append('package')
-            result.append('name')
-            return result
+        cinfo = CARGO_COMMANDS[command]
+        result = []
+        if cinfo.get('requires_manifest', True):
+            result.append('package')
+        result.append('name')
+        return result
 
     def items_package(self):
         result = super(CargoCreateNewBuild, self).items_package()
@@ -874,10 +862,9 @@ class CargoCreateNewBuild(CargoConfigBase):
     def items_name(self):
         name = '%s\'s %s' % (getpass.getuser(),
             self.choices.get('new_command', self.choices['command']))
-        target = self.choices.get('target', None)
-        if target:
+        if target := self.choices.get('target', None):
             target = target.replace('-', '')
-            name = name + ' %s' % (target,)
+            name = f'{name} {target}'
         return {
             'caption': 'Enter a name for your new Cargo build system:',
             'default': name
@@ -946,5 +933,5 @@ class CargoCreateNewBuild(CargoConfigBase):
 
     def _stock_build_system(self):
         pkg_name = __name__.split('.')[0]
-        resource = 'Packages/%s/RustEnhanced.sublime-build' % pkg_name
+        resource = f'Packages/{pkg_name}/RustEnhanced.sublime-build'
         return sublime.decode_value(sublime.load_resource(resource))

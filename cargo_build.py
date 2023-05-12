@@ -109,20 +109,17 @@ class CargoExecCommand(sublime_plugin.WindowCommand):
 
         This may trigger some Sublime user interaction if necessary.
         """
-        working_dir = self.initial_settings.get('working_dir')
-        if working_dir:
+        if working_dir := self.initial_settings.get('working_dir'):
             self.working_dir = working_dir
             self.settings_path = working_dir
             return on_done()
 
-        script_path = self.initial_settings.get('script_path')
-        if script_path:
+        if script_path := self.initial_settings.get('script_path'):
             self.working_dir = os.path.dirname(script_path)
             self.settings_path = script_path
             return on_done()
 
-        default_path = self.settings.get_project_base('default_path')
-        if default_path:
+        if default_path := self.settings.get_project_base('default_path'):
             self.settings_path = default_path
             if os.path.isfile(default_path):
                 self.working_dir = os.path.dirname(default_path)
@@ -320,7 +317,7 @@ def _target_to_test(what, view, on_done):
     td = target_detect.TargetDetector(view.window())
     targets = td.determine_targets(view.file_name())
     if len(targets) == 0:
-        sublime.error_message('Error: Could not determine target to %s.' % what)
+        sublime.error_message(f'Error: Could not determine target to {what}.')
     elif len(targets) == 1:
         on_done(' '.join(targets[0][1]))
     else:
@@ -339,12 +336,12 @@ def _pt_to_test_name(what, pt, view):
     pat = TEST_PATTERN.format(WHAT=what, **globals())
     regions = view.find_all(pat, 0, r'\1', fn_names)
     if not regions:
-        sublime.error_message('Could not find a Rust %s function.' % what)
+        sublime.error_message(f'Could not find a Rust {what} function.')
         return None
     # Assuming regions are in ascending order.
     indices = [i for (i, r) in enumerate(regions) if r.a <= pt]
     if not indices:
-        sublime.error_message('No %s functions found about the current point.' % what)
+        sublime.error_message(f'No {what} functions found about the current point.')
         return None
     return fn_names[indices[-1]]
 
@@ -354,13 +351,16 @@ def _cargo_test_pt(what, pt, view):
     def do_test(target):
         test_fn_name = _pt_to_test_name(what, pt, view)
         if test_fn_name:
-            view.window().run_command('cargo_exec', args={
-                'command': what,
-                'settings': {
-                    'target': target,
-                    'extra_run_args': '--exact ' + test_fn_name
-                }
-            })
+            view.window().run_command(
+                'cargo_exec',
+                args={
+                    'command': what,
+                    'settings': {
+                        'target': target,
+                        'extra_run_args': f'--exact {test_fn_name}',
+                    },
+                },
+            )
 
     _target_to_test(what, view, do_test)
 
@@ -589,7 +589,11 @@ def plugin_unloaded():
         # that it gets completely unloaded so that when it upgrades it will
         # load the new package. See
         # https://github.com/SublimeTextIssues/Core/issues/2207
-        re_keys = [key for key in sys.modules if key.startswith(package_name + '.rust')]
+        re_keys = [
+            key
+            for key in sys.modules
+            if key.startswith(f'{package_name}.rust')
+        ]
         for key in re_keys:
             del sys.modules[key]
         if package_name in sys.modules:
@@ -608,8 +612,10 @@ def plugin_loaded():
             for view in window.views():
                 fname = view.file_name()
                 if fname and fname.endswith('.rs'):
-                    view.settings().set('syntax',
-                        'Packages/%s/RustEnhanced.sublime-syntax' % (package_name,))
+                    view.settings().set(
+                        'syntax',
+                        f'Packages/{package_name}/RustEnhanced.sublime-syntax',
+                    )
 
         # Disable the built-in Rust package.
         settings = sublime.load_settings('Preferences.sublime-settings')

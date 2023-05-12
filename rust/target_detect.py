@@ -25,9 +25,7 @@ class TargetDetector(object):
 
         :raises ProcessTerminatedError: Thread should shut down.
         """
-        # Try checking for target match in settings.
-        result = self._targets_manual_config(file_name)
-        if result:
+        if result := self._targets_manual_config(file_name):
             return result
 
         # Try a heuristic to detect the filename.
@@ -49,15 +47,10 @@ class TargetDetector(object):
                     target['src_path'] = os.path.join(root_path, target['src_path'])
                 target['src_path'] = os.path.normpath(target['src_path'])
 
-            # Try exact filename matches.
-            result = self._targets_exact_match(targets, file_name)
-            if result:
+            if result := self._targets_exact_match(targets, file_name):
                 return result
 
-            # No exact match, try to find all targets with longest matching
-            # parent directory.
-            result = self._targets_longest_matches(targets, file_name)
-            if result:
+            if result := self._targets_longest_matches(targets, file_name):
                 return result
 
         log.log(self.window,
@@ -76,8 +69,7 @@ class TargetDetector(object):
                 if file_name == os.path.join(src_root, tfile):
                     return [(tfile, tcmd.split())]
             else:
-                target = targets.get('_default', '')
-                if target:
+                if target := targets.get('_default', ''):
                     # Unfortunately don't have the target src filename.
                     return [('', target)]
         return None
@@ -105,7 +97,7 @@ class TargetDetector(object):
         if kind in ('lib', 'rlib', 'dylib', 'cdylib', 'staticlib', 'proc-macro'):
             return (target['src_path'], ['--lib'])
         elif kind in ('bin', 'test', 'example', 'bench'):
-            return (target['src_path'], ['--' + kind, target['name']])
+            return target['src_path'], [f'--{kind}', target['name']]
         elif kind in ('custom-build',):
             # Currently no way to target build.rs explicitly.
             # Or, run rustc (without cargo) on build.rs.
@@ -119,8 +111,7 @@ class TargetDetector(object):
         """Check for Cargo targets that exactly match the current file."""
         for target in targets:
             if target['src_path'] == file_name:
-                args = self._target_to_args(target)
-                if args:
+                if args := self._target_to_args(target):
                     return [args]
         return None
 
@@ -143,8 +134,7 @@ class TargetDetector(object):
         while not found:
             for target in targets:
                 if os.path.dirname(target['src_path']) == path_match:
-                    target_args = self._target_to_args(target)
-                    if target_args:
+                    if target_args := self._target_to_args(target):
                         result.append(target_args)
                         found = True
                         if target_args[1][0] == '--bin':

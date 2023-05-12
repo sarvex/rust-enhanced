@@ -220,11 +220,7 @@ class TestSyntaxCheck(TestBase):
                 continue
             emsg_row, _ = view.rowcol(emsg_info['end'])
             for i, msg in enumerate(actual_messages):
-                if msg.span:
-                    actual_row = msg.lineno()
-                else:
-                    # Last line of view.
-                    actual_row = view.rowcol(view.size())[0]
+                actual_row = msg.lineno() if msg.span else view.rowcol(view.size())[0]
                 if actual_row == emsg_row:
                     if msg.suggested_replacement is not None:
                         actual_text = unescape(msg._render_suggested_replacement())
@@ -265,8 +261,8 @@ class TestSyntaxCheck(TestBase):
         theme_data = {}
         for theme in theme_names:
             batches = messages.WINDOW_MESSAGES.get(sublime.active_window().id(), {})\
-                                              .get('paths', {})\
-                                              .get(view.file_name(), [])
+                                                  .get('paths', {})\
+                                                  .get(view.file_name(), [])
             theme_data[theme] = output = []
             for batch in batches:
                 output.append(themes.THEMES[theme].render(view, batch))
@@ -379,13 +375,15 @@ class TestSyntaxCheck(TestBase):
             else:
                 raise AssertionError('Invalid test:  %r did not have region before row %r' % (
                     view.file_name(), row))
-            result.append({
-                'begin': actual_region[0],
-                'end': actual_region[1],
-                'level': msg_level_text[m.group(1)],
-                'restrictions': m.group(2),
-                'message': m.group(3)
-            })
+            result.append(
+                {
+                    'begin': actual_region[0],
+                    'end': actual_region[1],
+                    'level': msg_level_text[m[1]],
+                    'restrictions': m[2],
+                    'message': m[3],
+                }
+            )
 
         # Single-line spans.
         last_line = None
@@ -403,18 +401,17 @@ class TestSyntaxCheck(TestBase):
             else:
                 last_line = row
                 last_line_offset = 1
-            begin = view.text_point(row - 1, col + 2 + len(m.group(1)))
-            if m.group(2) == '|':
-                end = begin
-            else:
-                end = begin + len(m.group(2))
-            result.append({
-                'begin': begin,
-                'end': end,
-                'level': msg_level_text[m.group(3)],
-                'restrictions': m.group(4),
-                'message': m.group(5)
-            })
+            begin = view.text_point(row - 1, col + 2 + len(m[1]))
+            end = begin if m[2] == '|' else begin + len(m[2])
+            result.append(
+                {
+                    'begin': begin,
+                    'end': end,
+                    'level': msg_level_text[m[3]],
+                    'restrictions': m[4],
+                    'message': m[5],
+                }
+            )
 
         # Messages that appear at the beginning or end of the file.
         for what, pos in [('start', 0), ('end', view.size())]:
@@ -423,13 +420,15 @@ class TestSyntaxCheck(TestBase):
             for region in regions:
                 text = view.substr(region)
                 m = re.match(pattern, text)
-                result.append({
-                    'begin': pos,
-                    'end': pos,
-                    'level': msg_level_text[m.group(1)],
-                    'restrictions': m.group(2),
-                    'message': m.group(3),
-                })
+                result.append(
+                    {
+                        'begin': pos,
+                        'end': pos,
+                        'level': msg_level_text[m[1]],
+                        'restrictions': m[2],
+                        'message': m[3],
+                    }
+                )
 
         return result
 
@@ -439,4 +438,4 @@ def _altered_settings(name, values):
 
 
 def _setup_debug(setup):
-    return '\n' + '\n'.join(['    ' + str(s) for s in setup])
+    return '\n' + '\n'.join([f'    {str(s)}' for s in setup])

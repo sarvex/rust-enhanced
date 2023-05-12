@@ -97,13 +97,12 @@ class RustSyntaxCheckThread(rust_thread.RustThread, rust_proc.ProcListener):
         finally:
             self.done = True
         messages.messages_finished(self.window)
-        counts = messages.message_counts(self.window)
-        if counts:
+        if counts := messages.message_counts(self.window):
             msg = []
             for key, value in sorted(counts.items(), key=lambda x: x[0]):
                 level = key.plural if value > 1 else key.name
                 msg.append('%i %s' % (value, level))
-            self.window.status_message('Rust check: %s' % (', '.join(msg,)))
+            self.window.status_message(f"Rust check: {', '.join(msg)}")
         elif rc:
             self.window.status_message(CHECK_FAIL_MSG)
         else:
@@ -128,7 +127,7 @@ class RustSyntaxCheckThread(rust_thread.RustThread, rust_proc.ProcListener):
             sublime.set_timeout(lambda: self.update_status(count + 1), status_update_delay)
         except Exception as e:
             self.window.status_message('Error setting status text!')
-            log.critical(self.window, "An error occurred setting status text: " + str(e))
+            log.critical(self.window, f"An error occurred setting status text: {str(e)}")
 
     def get_rustc_messages(self):
         """Top-level entry point for generating messages for the given

@@ -77,10 +77,10 @@ class TestInterrupt(TestBase):
         t1.join()
         t2.join()
         self.assertEqual(self.terminated, [t1])
-        self.assertEqual(self._files(),
-            [pattern + '-start-1',
-             pattern + '-start-2',
-             pattern + '-end-1'])
+        self.assertEqual(
+            self._files(),
+            [f'{pattern}-start-1', f'{pattern}-start-2', f'{pattern}-end-1'],
+        )
 
     def test_build_cancel(self):
         """Test manually canceling a build."""
@@ -100,7 +100,7 @@ class TestInterrupt(TestBase):
         t.join()
         self.assertEqual(self.terminated, [t])
         # Start, but no end.
-        self.assertEqual(self._files(), [pattern + '-start-1'])
+        self.assertEqual(self._files(), [f'{pattern}-start-1'])
 
     def test_syntax_check_cancel(self):
         """Test manually canceling syntax check."""
@@ -119,7 +119,7 @@ class TestInterrupt(TestBase):
         t.join()
         self.assertEqual(self.terminated, [t])
         # Start, but no end.
-        self.assertEqual(self._files(), [pattern + '-start-1'])
+        self.assertEqual(self._files(), [f'{pattern}-start-1'])
 
     def test_syntax_check_while_build(self):
         """Test starting a syntax check while build is running."""
@@ -141,9 +141,7 @@ class TestInterrupt(TestBase):
         check_t.join()
         build_t.join()
         self.assertEqual(self.terminated, [])
-        self.assertEqual(self._files(),
-            [pattern + '-start-1',
-             pattern + '-end-1'])
+        self.assertEqual(self._files(), [f'{pattern}-start-1', f'{pattern}-end-1'])
 
     def test_build_while_syntax_check(self):
         """Test starting a build while a syntax check is running."""
@@ -164,10 +162,10 @@ class TestInterrupt(TestBase):
         build_t.join()
         check_t.join()
         self.assertEqual(self.terminated, [check_t])
-        self.assertEqual(self._files(),
-            [pattern + '-start-1',
-             pattern + '-start-2',
-             pattern + '-end-1'])
+        self.assertEqual(
+            self._files(),
+            [f'{pattern}-start-1', f'{pattern}-start-2', f'{pattern}-end-1'],
+        )
 
     def test_build_with_save(self):
         """Test starting a build with a dirty file."""
@@ -189,9 +187,7 @@ class TestInterrupt(TestBase):
         on_save_thread.join()
         build_t.join()
         self.assertEqual(self.terminated, [on_save_thread])
-        self.assertEqual(self._files(),
-            [pattern + '-start-1',
-             pattern + '-end-1'])
+        self.assertEqual(self._files(), [f'{pattern}-start-1', f'{pattern}-end-1'])
         # Clear dirty flag so that closing the view does not pop up a
         # confirmation box.
         view.run_command('revert')
@@ -227,23 +223,23 @@ class TestInterrupt(TestBase):
             next_build_t.join()
             # Should not have interrupted next_build_t.
             self.assertEqual(self.terminated, [build_t])
-            self.assertEqual(self._files(),
-                [pattern + '-start-1',
-                 pattern + '-start-2',
-                 pattern + '-end-1'])
+            self.assertEqual(
+                self._files(),
+                [f'{pattern}-start-1', f'{pattern}-start-2', f'{pattern}-end-1'],
+            )
         finally:
             sublime.ok_cancel_dialog = orig_ok_cancel_dialog
 
     def _wait_for_start(self):
         for _ in range(100):
             time.sleep(0.1)
-            if self._files() == [pattern + '-start-1']:
+            if self._files() == [f'{pattern}-start-1']:
                 break
         else:
             raise AssertionError('Did not catch initial start: %r' % (
                 self._files(),))
 
     def _files(self):
-        files = glob.glob(pattern + '-*')
+        files = glob.glob(f'{pattern}-*')
         files.sort(key=os.path.getctime)
         return files

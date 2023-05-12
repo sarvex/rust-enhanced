@@ -24,31 +24,31 @@ class TestCargoSettings(TestBase):
 
         cb = {'defaults': {'extra_cargo_args': 'global_args'}}
         self._override_setting('cargo_build', cb)
-        check_cmd(cmd + ' global_args')
+        check_cmd(f'{cmd} global_args')
 
         settings.set_project_default('extra_cargo_args', 'project_defaults')
-        check_cmd(cmd + ' project_defaults')
+        check_cmd(f'{cmd} project_defaults')
 
         cb['variants'] = {'build': {'extra_cargo_args': 'global_var_args'}}
         self._override_setting('cargo_build', cb)
-        check_cmd(cmd + ' global_var_args')
+        check_cmd(f'{cmd} global_var_args')
 
         settings.set_project_variant('build',
             'extra_cargo_args', 'project_var_args')
-        check_cmd(cmd + ' project_var_args')
+        check_cmd(f'{cmd} project_var_args')
 
         settings.set_project_package_default(manifest_dir,
             'extra_cargo_args', 'proj_pack_def_arg')
-        check_cmd(cmd + ' proj_pack_def_arg')
+        check_cmd(f'{cmd} proj_pack_def_arg')
 
         settings.set_project_package_variant(manifest_dir, 'build',
             'extra_cargo_args', 'proj_pack_var_arg')
-        check_cmd(cmd + ' proj_pack_var_arg')
+        check_cmd(f'{cmd} proj_pack_var_arg')
 
         settings.set_project_package_target(manifest_dir, '--example ex1',
             'extra_cargo_args', 'proj_pack_target_args')
         # Does not change.
-        check_cmd(cmd + ' proj_pack_var_arg')
+        check_cmd(f'{cmd} proj_pack_var_arg')
 
         # Change the default target.
         settings.set_project_package_variant(manifest_dir, 'build', 'target',

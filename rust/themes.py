@@ -9,8 +9,7 @@ POPUP_CSS = 'body { margin: 0.25em; }'
 
 def _help_link(code):
     if code:
-        return ' <a href="https://doc.rust-lang.org/error-index.html#%s" class="rust-help-link">?</a>' % (
-            code,)
+        return f' <a href="https://doc.rust-lang.org/error-index.html#{code}" class="rust-help-link">?</a>'
     else:
         return ''
 
@@ -86,11 +85,7 @@ class ClearTheme(Theme):
     """)
 
     def render(self, view, batch, for_popup=False):
-        if for_popup:
-            extra_css = POPUP_CSS
-        else:
-            extra_css = ''
-
+        extra_css = POPUP_CSS if for_popup else ''
         # Collect all the messages for this batch.
         msgs = []
         last_level = None
@@ -102,11 +97,10 @@ class ClearTheme(Theme):
                 continue
             if msg.suggested_replacement is not None:
                 level_text = ''
+            elif msg.level == last_level:
+                level_text = '&nbsp;' * (len(str(msg.level)) + 2)
             else:
-                if msg.level == last_level:
-                    level_text = '&nbsp;' * (len(str(msg.level)) + 2)
-                else:
-                    level_text = '%s: ' % (msg.level,)
+                level_text = f'{msg.level}: '
             last_level = msg.level
             if i == 0:
                 # Only show close link on first message of a batch.
@@ -123,15 +117,15 @@ class ClearTheme(Theme):
 
         # Add cross-links.
         if isinstance(batch, PrimaryBatch):
-            for url, path in batch.child_links:
-                msgs.append(self.LINK_TMPL.format(
-                    url=url, text=see_also(url), path=path))
-        else:
-            if batch.back_link:
-                msgs.append(self.LINK_TMPL.format(
-                    url=batch.back_link[0],
-                    text='See Primary:',
-                    path=batch.back_link[1]))
+            msgs.extend(
+                self.LINK_TMPL.format(url=url, text=see_also(url), path=path)
+                for url, path in batch.child_links
+            )
+        elif batch.back_link:
+            msgs.append(self.LINK_TMPL.format(
+                url=batch.back_link[0],
+                text='See Primary:',
+                path=batch.back_link[1]))
 
         return self.TMPL.format(
             error_color=util.get_setting('rust_syntax_error_color'),
@@ -241,16 +235,9 @@ class SolidTheme(Theme):
             # look as good, but is close enough.
             # See https://github.com/SublimeTextIssues/Core/issues/2228
             path = util.icon_path(level, res=2)
-            if not path:
-                return ''
-            else:
-                return '<img class="rust-level-icon" src="res://%s">' % (path,)
+            return '' if not path else f'<img class="rust-level-icon" src="res://{path}">'
 
-        if for_popup:
-            extra_css = POPUP_CSS
-        else:
-            extra_css = ''
-
+        extra_css = POPUP_CSS if for_popup else ''
         # Collect all the child messages together.
         children = []
         for child in batch.children:
@@ -328,10 +315,10 @@ class TestTheme(Theme):
 
         if isinstance(batch, PrimaryBatch):
             for url, path in batch.child_links:
-                add_fake(batch.primary_message, see_also(url) + ' ' + path)
+                add_fake(batch.primary_message, f'{see_also(url)} {path}')
         else:
             if batch.back_link:
-                add_fake(batch.first(), 'See Primary: ' + batch.back_link[1])
+                add_fake(batch.first(), f'See Primary: {batch.back_link[1]}')
         return None
 
 
@@ -342,7 +329,4 @@ THEMES = {
 }
 
 def see_also(path):
-    if path.endswith(':external'):
-        return 'See Also (external):'
-    else:
-        return 'See Also:'
+    return 'See Also (external):' if path.endswith(':external') else 'See Also:'

@@ -300,18 +300,18 @@ class CargoSettings(object):
         v = initial_settings.get(key)
         if v is None:
             v = self.get_project_package_target(settings_path, target, key)
-            if v is None:
-                v = self.get_project_package_variant(settings_path, variant, key)
-                if v is None:
-                    v = self.get_project_package_default(settings_path, key)
-                    if v is None:
-                        v = self.get_project_variant(variant, key)
-                        if v is None:
-                            v = self.get_global_variant(variant, key)
-                            if v is None:
-                                v = self.get_project_default(key)
-                                if v is None:
-                                    v = self.get_global_default(key, default)
+        if v is None:
+            v = self.get_project_package_variant(settings_path, variant, key)
+        if v is None:
+            v = self.get_project_package_default(settings_path, key)
+        if v is None:
+            v = self.get_project_variant(variant, key)
+        if v is None:
+            v = self.get_global_variant(variant, key)
+        if v is None:
+            v = self.get_project_default(key)
+        if v is None:
+            v = self.get_global_default(key, default)
         return v
 
     def get_merged(self, settings_path, variant, target, key,
@@ -387,7 +387,7 @@ class CargoSettings(object):
 
         toolchain = get_computed('toolchain', None)
         if toolchain:
-            result.append('+' + toolchain)
+            result.append(f'+{toolchain}')
 
         # Command to run.
         result.append(cmd_info['command'])

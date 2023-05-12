@@ -78,7 +78,7 @@ def parse(version):
     """
     match = _REGEX.match(version)
     if match is None:
-        raise ValueError('%s is not valid SemVer string' % version)
+        raise ValueError(f'{version} is not valid SemVer string')
 
     version_parts = match.groupdict()
 
@@ -119,11 +119,13 @@ def parse_version_info(version):
     :rtype: :class:`VersionInfo`
     """
     parts = parse(version)
-    version_info = VersionInfo(
-            parts['major'], parts['minor'], parts['patch'],
-            parts['prerelease'], parts['build'])
-
-    return version_info
+    return VersionInfo(
+        parts['major'],
+        parts['minor'],
+        parts['patch'],
+        parts['prerelease'],
+        parts['build'],
+    )
 
 
 def compare(ver1, ver2):
@@ -234,10 +236,7 @@ def max_ver(ver1, ver2):
     :rtype: :class:`VersionInfo`
     """
     cmp_res = compare(ver1, ver2)
-    if cmp_res == 0 or cmp_res == 1:
-        return ver1
-    else:
-        return ver2
+    return ver1 if cmp_res in [0, 1] else ver2
 
 
 def min_ver(ver1, ver2):
@@ -249,10 +248,7 @@ def min_ver(ver1, ver2):
     :rtype: :class:`VersionInfo`
     """
     cmp_res = compare(ver1, ver2)
-    if cmp_res == 0 or cmp_res == -1:
-        return ver1
-    else:
-        return ver2
+    return ver1 if cmp_res in [0, -1] else ver2
 
 
 def format_version(major, minor, patch, prerelease=None, build=None):
@@ -268,10 +264,10 @@ def format_version(major, minor, patch, prerelease=None, build=None):
     """
     version = "%d.%d.%d" % (major, minor, patch)
     if prerelease is not None:
-        version = version + "-%s" % prerelease
+        version = f"{version}-{prerelease}"
 
     if build is not None:
-        version = version + "+%s" % build
+        version = f"{version}+{build}"
 
     return version
 
@@ -281,8 +277,7 @@ def _increment_string(string):
     Look for the last sequence of number(s) in a string and increment, from:
     http://code.activestate.com/recipes/442460-increment-numbers-in-a-string/#c1
     """
-    match = _LAST_NUMBER.search(string)
-    if match:
+    if match := _LAST_NUMBER.search(string):
         next_ = str(int(match.group(1)) + 1)
         start, end = match.span(1)
         string = string[:max(end - len(next_), start)] + next_ + string[end:]

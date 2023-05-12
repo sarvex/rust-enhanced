@@ -46,9 +46,8 @@ class RustThread(object):
 
     def describe(self):
         """Returns a string with the name of the thread."""
-        p = self.current_proc
-        if p:
-            return '%s: %s' % (self.name, ' '.join(p.cmd))
+        if p := self.current_proc:
+            return f"{self.name}: {' '.join(p.cmd)}"
         else:
             return self.name
 
@@ -78,14 +77,14 @@ class RustThread(object):
 
                     The following Rust command is still running, do you want to cancel it?
                     %s""" % self.describe()
-                if sublime.ok_cancel_dialog(util.multiline_fix(msg),
-                                            'Stop Running Command'):
-                    t.terminate()
-                    t.join()
-                else:
+                if not sublime.ok_cancel_dialog(
+                    util.multiline_fix(msg), 'Stop Running Command'
+                ):
                     # Allow the original process to finish.
                     return
-            # Try again.
+                t.terminate()
+                t.join()
+                # Try again.
 
         try:
             self.run()

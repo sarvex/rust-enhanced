@@ -22,7 +22,7 @@ def create_output_panel(window, base_dir):
     else:
         build_pattern = '^[ \\t]*-->[ \\t]*([^<\n]*):([0-9]+):([0-9]+)'
         test_pattern = ', ([^,<\n]*\\.[A-z]{2}):([0-9]+)'
-        pattern = '(?|%s|%s)' % (build_pattern, test_pattern)
+        pattern = f'(?|{build_pattern}|{test_pattern})'
         s.set('result_file_regex', pattern)
     # Used for resolving relative paths.
     s.set('result_base_dir', base_dir)
@@ -35,7 +35,7 @@ def create_output_panel(window, base_dir):
     # XXX: Is this necessary?
     # self.window.create_output_panel(PANEL_NAME)
     if util.get_setting('show_panel_on_build', True):
-        window.run_command('show_panel', {'panel': 'output.' + PANEL_NAME})
+        window.run_command('show_panel', {'panel': f'output.{PANEL_NAME}'})
     return output_view
 
 
@@ -66,7 +66,7 @@ class OutputListener(rust_proc.ProcListener):
 
     def on_begin(self, proc):
         self.output_view = create_output_panel(self.window, self.base_path)
-        self._append('[Running: %s]' % (' '.join(proc.cmd),))
+        self._append(f"[Running: {' '.join(proc.cmd)}]")
 
     def on_data(self, proc, data):
         region_start = self.output_view.size()
@@ -76,19 +76,19 @@ class OutputListener(rust_proc.ProcListener):
             # Re-fetch the data to handle things like \t expansion.
             appended = self.output_view.substr(
                 sublime.Region(region_start, self.output_view.size()))
-            m = re.search(r', ([^,<\n]*\.[A-z]{2}):([0-9]+):([0-9]+)',
-                appended)
-            if m:
-                path = os.path.join(self.base_path, m.group(1))
+            if m := re.search(
+                r', ([^,<\n]*\.[A-z]{2}):([0-9]+):([0-9]+)', appended
+            ):
+                path = os.path.join(self.base_path, m[1])
                 if not os.path.exists(path):
                     # Panics outside of the crate display a path to that
                     # crate's source file (such as libcore), which is probably
                     # not available.
                     return
                 message = messages.Message()
-                lineno = int(m.group(2)) - 1
+                lineno = int(m[2]) - 1
                 # Region columns appear to the left, so this is +1.
-                col = int(m.group(3))
+                col = int(m[3])
                 # Rust 1.24 changed column numbering to be 1-based.
                 if semver.match(self.rustc_version, '>=1.24.0-beta'):
                     col -= 1
@@ -119,19 +119,18 @@ class OutputListener(rust_proc.ProcListener):
             # Region-only messages can be ignored.
             return
         region_start = self.output_view.size() + len(message.level.name) + 2
-        path = message.path
-        if path:
+        if path := message.path:
             if self.base_path and path.startswith(self.base_path):
                 path = os.path.relpath(path, self.base_path)
             if message.span:
                 highlight_text = '%s:%d' % (path, message.span[0][0] + 1)
             else:
                 highlight_text = path
-            self._append('%s: %s: %s' % (message.level, highlight_text, message.text))
+            self._append(f'{message.level}: {highlight_text}: {message.text}')
             region = sublime.Region(region_start,
                                     region_start + len(highlight_text))
         else:
-            self._append('%s: %s' % (message.level, message.text))
+            self._append(f'{message.level}: {message.text}')
             region = sublime.Region(region_start)
         message.output_panel_region = region
 

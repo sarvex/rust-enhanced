@@ -23,10 +23,7 @@ class WindowLog:
             self.view.run_command("right_delete")
 
     def add_message(self, msg, args):
-        if self.messages:
-            previous_time = self.messages[-1].time
-        else:
-            previous_time = None
+        previous_time = self.messages[-1].time if self.messages else None
         lm = LogMessage(msg, args, previous_time)
         self.messages.append(lm)
         self._display_message(lm)
@@ -60,10 +57,7 @@ class LogMessage:
             last_time = '+0.000'
         else:
             last_time = '+%.3f' % (self.time - self.previous_time,)
-        if self.args:
-            rendered = self.msg % self.args
-        else:
-            rendered = self.msg
+        rendered = self.msg % self.args if self.args else self.msg
         return '%s %s\n' % (last_time, rendered.rstrip())
 
 

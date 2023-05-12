@@ -16,10 +16,7 @@ def index_with(l, cb):
         what you are searching for.
     :returns: Returns the index of the match, or -1 if no match.
     """
-    for i, v in enumerate(l):
-        if cb(v):
-            return i
-    return -1
+    return next((i for i, v in enumerate(l) if cb(v)), -1)
 
 
 def multiline_fix(s):
@@ -29,8 +26,7 @@ def multiline_fix(s):
 
 def get_setting(name, default=None):
     """Retrieve a setting from Sublime settings."""
-    pdata = sublime.active_window().project_data()
-    if pdata:
+    if pdata := sublime.active_window().project_data():
         v = pdata.get('settings', {}).get(name)
         if v is not None:
             return v
@@ -51,7 +47,7 @@ def get_rustc_version(window, cwd, toolchain=None):
     from . import rust_proc
     cmd = ['rustc']
     if toolchain:
-        cmd.append('+' + toolchain)
+        cmd.append(f'+{toolchain}')
     cmd.append('--version')
     output = rust_proc.check_output(window, cmd, cwd)
     # Example outputs:
@@ -94,15 +90,13 @@ def active_view_is_rust(window=None, view=None):
     if not view:
         return False
     # Require it to be saved to disk.
-    if not view.file_name():
-        return False
-    return 'source.rust' in view.scope_name(0)
+    return False if not view.file_name() else 'source.rust' in view.scope_name(0)
 
 
 def is_rust_view(settings):
     """Helper for use with ViewEventListener."""
     s = settings.get('syntax')
-    return (s == 'Packages/%s/RustEnhanced.sublime-syntax' % (PACKAGE_NAME,))
+    return s == f'Packages/{PACKAGE_NAME}/RustEnhanced.sublime-syntax'
 
 
 def get_cargo_metadata(window, cwd, toolchain=None):
@@ -129,12 +123,9 @@ def get_cargo_metadata(window, cwd, toolchain=None):
     from . import rust_proc
     cmd = ['cargo']
     if toolchain:
-        cmd.append('+' + toolchain)
+        cmd.append(f'+{toolchain}')
     cmd.extend(['metadata', '--no-deps'])
-    output = rust_proc.slurp_json(window,
-                                  cmd,
-                                  cwd=cwd)
-    if output:
+    if output := rust_proc.slurp_json(window, cmd, cwd=cwd):
         return output[0]
     else:
         return None
@@ -148,13 +139,8 @@ def icon_path(level, res=None):
     gutter_style = get_setting('rust_gutter_style', 'shape')
     if gutter_style == 'none':
         return ''
-    else:
-        if res:
-            res_suffix = '@%ix' % (res,)
-        else:
-            res_suffix = ''
-        return 'Packages/%s/images/gutter/%s-%s%s.png' % (
-            PACKAGE_NAME, gutter_style, level, res_suffix)
+    res_suffix = '@%ix' % (res,) if res else ''
+    return f'Packages/{PACKAGE_NAME}/images/gutter/{gutter_style}-{level}{res_suffix}.png'
 
 
 def open_views_for_file(window, file_name):
